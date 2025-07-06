@@ -17,6 +17,7 @@ You need [Visual Studio](https://visualstudio.microsoft.com/de/downloads/) If yo
 Save the project and open it in Visual Studio or compile it on the command line:
 !!! You need to use the Native Tools Command Prompt for VS not the standard CMD !!!
 
+
 ```
 $ cl main.cpp /link user32.lib gdi32.lib shell32.lib 
 ```
@@ -30,6 +31,35 @@ To run a game you can drag and drop it onto the .exe in Windows or you can call 
 ```
 $ chip8.exe /pathToRom
 ```
+
+## 💡 Implementation Details
+
+### Sound: Non-blocking Beep using Detached Thread
+
+CHIP-8 originally had no complex audio output — it simply produced a short tone whenever the sound timer was active.
+
+To replicate this, the emulator uses the Windows API function `Beep()` to play a simple tone. However, `Beep()` is **blocking**, meaning it would freeze the main thread during sound playback and disrupt rendering and input.
+
+To prevent this, the sound is emitted in a separate, **detached thread**:
+
+```cpp
+std::thread beepThread(playSound);
+beepThread.detach();
+```
+
+This ensures the emulator keeps running at a smooth 60 FPS and remains responsive while emitting tones — without needing external audio libraries.
+
+### 🖼️ Rendering: Software-based Scaling with SetDIBitsToDevice
+
+CHIP-8 games use a **64×32 monochrome resolution**, which is upscaled to a larger window (e.g. 640×320) for display.
+
+To keep rendering fully in **software**, this emulator uses the WinAPI function `SetDIBitsToDevice()`:
+
+```cpp
+SetDIBitsToDevice(hdc, 0, 0, (width * upscalefactor), (height * upscalefactor), 0, 0, 0, (height * upscalefactor), upscaledgraphic10x, (BITMAPINFO*)&bmi, DIB_RGB_COLORS);
+```
+
+Instead of StretchDIBits() (which may use hardware acceleration), this approach ensures that every frame is rendered purely in software.
 
 ## License
 
